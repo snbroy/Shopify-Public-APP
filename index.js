@@ -11,6 +11,10 @@ app.use(express.json());
 
 app.use("/", authRoutes);
 
+app.get("/", async (req, res) => {
+  res.send("Homepage");
+});
+
 app.listen(5000, () => {
   console.log("Shopify app server running on port 5000");
 });
