@@ -1,0 +1,33 @@
+# Node dependencies
+/node_modules
+
+# Environment variables
+.env
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode
+
+# Compiled files
+*.tsbuildinfo
+
+# Build outputs (optional if using a dist/build dir)
+/dist
+/build
+
+# Shopify CLI local app files
+/shopify.app.toml
+/.shopify-cli
+/.cache
+
+# MongoDB local database
+*.local
