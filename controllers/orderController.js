@@ -1,4 +1,4 @@
-import { getAccessToken } from "../models/shopModel";
+import { getAccessToken } from "../models/shopModel.js";
 
 const createCodOrder = async (req, res) => {
   try {
