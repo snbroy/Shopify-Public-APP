@@ -21,8 +21,8 @@ export const authCallback = async (req, res) => {
     const token = await fetchToken(shop, code);
     console.log(token, "Token");
     await storeAccessToken(shop, token);
-    res.send("App successfully installed!");
     return res.redirect(`https://${shop}/admin/apps/${SHOPIFY_API_KEY}`);
+    res.send("App successfully installed!");
   } catch (e) {
     res.status(500).send("OAuth Error: " + e.message);
   }
