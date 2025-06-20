@@ -23,6 +23,23 @@ const createCodOrder = async (req, res) => {
         .json({ error: true, message: "accestoken is not found" });
     }
 
+    console.log(accessToken, "acc");
+
+    if (
+      !variantId ||
+      !quantity ||
+      !name ||
+      !phone ||
+      !address ||
+      !city ||
+      !province ||
+      !zip
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing required fields." });
+    }
+
     // Here you'd place the order using Shopify Admin API or any other system
     // For mockup:
     const response = await axios.post(
