@@ -43,29 +43,29 @@ const createCodOrder = async (req, res) => {
     // Here you'd place the order using Shopify Admin API or any other system
     // For mockup:
     const response = await axios.post(
-      `https://${shop}/admin/api/2024-04/orders.json`,
+      `https://${shop}/admin/api/2024-01/orders.json`,
       {
         order: {
           line_items: [
             {
-              variant_id: variantId,
-              quantity: quantity,
+              variant_id: Number(variantId),
+              quantity: Number(quantity),
             },
           ],
+          financial_status: "pending", // Required for COD
           customer: {
             first_name: name,
-            phone,
           },
           shipping_address: {
+            first_name: name,
             address1: address,
-            address2: landmark,
-            city,
-            province,
-            zip,
+            address2: landmark || "",
+            city: city,
+            province: province,
+            zip: zip,
             country: "India",
           },
-          financial_status: "pending",
-          fulfillment_status: "unfulfilled",
+          phone: phone,
           tags: "COD",
         },
       },
