@@ -1,6 +1,7 @@
 import { getAccessToken as fetchToken } from "../utils/shopifyOAuth.js";
 import { getAccessToken, storeAccessToken } from "../models/shopModel.js";
 import { getInstallUrl } from "../utils/shopifyOAuth.js";
+import { SHOPIFY_API_KEY } from "../utils/constants.js";
 
 export const installApp = (req, res) => {
   const { shop } = req.query;
@@ -21,6 +22,7 @@ export const authCallback = async (req, res) => {
     console.log(token, "Token");
     await storeAccessToken(shop, token);
     res.send("App successfully installed!");
+    return res.redirect(`https://${shop}/admin/apps/${SHOPIFY_API_KEY}`);
   } catch (e) {
     res.status(500).send("OAuth Error: " + e.message);
   }
