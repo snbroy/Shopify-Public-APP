@@ -18,9 +18,10 @@ export const authCallback = async (req, res) => {
     return res.status(400).send("Missing required parameters");
 
   try {
-    const token = await fetchToken(shop, code);
-    console.log(token, "Token");
-    await storeAccessToken(shop, token);
+    const accessToken = await fetchToken(shop, code);
+    console.log(accessToken, "Token");
+    await storeAccessToken(shop, accessToken);
+    console.log("App successfully installed!");
     return res.redirect(`https://${shop}/admin/apps/${SHOPIFY_API_KEY}`);
     res.send("App successfully installed!");
   } catch (e) {
