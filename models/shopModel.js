@@ -13,9 +13,11 @@ export const getAccessToken = async (shop) => {
 
 export const storeAccessToken = async (shop, accessToken) => {
   console.log(accessToken, shop, "storeAccessToken");
-  await shopCollection.updateOne(
+  const ress = await shopCollection.updateOne(
     { shop },
     { $set: { shop, accessToken } },
     { upsert: true }
   );
+  console.log(ress, "ress");
+  console.log(shopCollection, "shopCollection");
 };
