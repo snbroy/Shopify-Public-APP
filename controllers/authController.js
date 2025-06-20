@@ -11,12 +11,14 @@ export const installApp = (req, res) => {
 };
 
 export const authCallback = async (req, res) => {
+  console.log(req.query, "req query");
   const { shop, code } = req.query;
   if (!shop || !code)
     return res.status(400).send("Missing required parameters");
 
   try {
     const token = await fetchToken(shop, code);
+    console.log(token, "Token");
     await storeAccessToken(shop, token);
     res.send("App successfully installed!");
   } catch (e) {

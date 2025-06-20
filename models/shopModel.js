@@ -12,6 +12,7 @@ export const getAccessToken = async (shop) => {
 };
 
 export const storeAccessToken = async (shop, accessToken) => {
+  console.log(accessToken, shop, "storeAccessToken");
   await shopCollection.updateOne(
     { shop },
     { $set: { shop, accessToken } },
