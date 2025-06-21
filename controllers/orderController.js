@@ -38,29 +38,14 @@ const createCodOrder = async (req, res) => {
         .json({ success: false, message: "Missing required fields." });
     }
 
-    const graphqlUrl = `https://${shop}/admin/api/2024-04/graphql.json`;
-
-    // Optional: Search for existing customer by phone
     let customerId = null;
+
+    // Search customer by phone number
     try {
-      const searchResponse = await axios.post(
-        graphqlUrl,
-        {
-          query: `
-            query ($query: String!) {
-              customers(first: 1, query: $query) {
-                edges {
-                  node {
-                    id
-                  }
-                }
-              }
-            }
-          `,
-          variables: {
-            query: `phone:${phone}`,
-          },
-        },
+      const response = await axios.get(
+        `https://${shop}/admin/api/2024-04/customers/search.json?query=phone:${encodeURIComponent(
+          phone
+        )}`,
         {
           headers: {
             "X-Shopify-Access-Token": accessToken,
@@ -69,74 +54,58 @@ const createCodOrder = async (req, res) => {
         }
       );
 
-      if (
-        searchResponse.data &&
-        searchResponse.data.data &&
-        searchResponse.data.data.customers &&
-        searchResponse.data.data.customers.edges.length > 0
-      ) {
-        customerId = searchResponse.data.data.customers.edges[0].node.id;
+      if (response.data.customers && response.data.customers.length > 0) {
+        customerId = response.data.customers[0].id;
       }
     } catch (err) {
       console.warn(
-        "Customer search skipped (no protected data access):",
-        err.response?.data?.errors || err.message
+        "Customer search failed:",
+        err?.response?.data?.errors || err.message
       );
     }
 
-    // Place the order
-    const orderResponse = await axios.post(
-      graphqlUrl,
-      {
-        query: `
-          mutation orderCreate($input: OrderInput!) {
-            orderCreate(input: $input) {
-              order {
-                id
-                name
-              }
-              userErrors {
-                field
-                message
-              }
-            }
-          }
-        `,
-        variables: {
-          input: {
-            lineItems: [
-              {
-                variantId: `gid://shopify/ProductVariant/${variantId}`,
-                quantity: parseInt(quantity),
-              },
-            ],
-            financialStatus: "PENDING",
-            paymentGatewayNames: ["cash_on_delivery"],
-            tags: ["COD"],
-            ...(customerId && { customer: { id: customerId } }),
-            shippingAddress: {
-              firstName: name,
-              address1: address,
-              address2: landmark || "",
-              city,
-              province,
-              zip,
-              country: "India",
-              phone,
-            },
-            billingAddress: {
-              firstName: name,
-              address1: address,
-              address2: landmark || "",
-              city,
-              province,
-              zip,
-              country: "India",
-              phone,
-            },
-          },
+    // Build the order payload
+    const orderPayload = {
+      order: {
+        financial_status: "pending", // COD = pending
+        send_receipt: true,
+        tags: "COD",
+        payment_gateway_names: ["cash_on_delivery"],
+        phone,
+        ...(customerId && { customer: { id: customerId } }),
+        shipping_address: {
+          first_name: name,
+          address1: address,
+          address2: landmark || "",
+          city,
+          province,
+          zip,
+          country: "India",
+          phone,
         },
+        billing_address: {
+          first_name: name,
+          address1: address,
+          address2: landmark || "",
+          city,
+          province,
+          zip,
+          country: "India",
+          phone,
+        },
+        line_items: [
+          {
+            variant_id: Number(variantId),
+            quantity: Number(quantity),
+          },
+        ],
       },
+    };
+
+    // Create the order
+    const createOrderResponse = await axios.post(
+      `https://${shop}/admin/api/2024-04/orders.json`,
+      orderPayload,
       {
         headers: {
           "X-Shopify-Access-Token": accessToken,
@@ -145,43 +114,19 @@ const createCodOrder = async (req, res) => {
       }
     );
 
-    const responseData = orderResponse.data;
-
-    // Handle GraphQL errors
-    if (responseData.errors) {
-      return res.status(400).json({
-        success: false,
-        message: "GraphQL error",
-        errors: responseData.errors,
-      });
-    }
-
-    const orderData = responseData.data?.orderCreate;
-    if (!orderData) {
-      return res
-        .status(500)
-        .json({
-          success: false,
-          message: "Order creation failed: no orderCreate response.",
-        });
-    }
-
-    if (orderData.userErrors?.length) {
-      return res
-        .status(400)
-        .json({ success: false, errors: orderData.userErrors });
-    }
-
-    res.status(200).json({ success: true, order: orderData.order });
-  } catch (error) {
-    console.error("Error placing order:", error.message);
     res
-      .status(500)
-      .json({
-        success: false,
-        message: "Internal Server Error",
-        error: error.message,
-      });
+      .status(200)
+      .json({ success: true, order: createOrderResponse.data.order });
+  } catch (error) {
+    console.error(
+      "Order creation failed:",
+      error.response?.data || error.message
+    );
+    res.status(500).json({
+      success: false,
+      message: "Order creation failed",
+      details: error.response?.data || error.message,
+    });
   }
 };
 
