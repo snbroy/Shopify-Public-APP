@@ -20,10 +20,8 @@ const createCodOrder = async (req, res) => {
     if (!accessToken) {
       return res
         .status(500)
-        .json({ error: true, message: "accestoken is not found" });
+        .json({ error: true, message: "Access token not found" });
     }
-
-    console.log(accessToken, "acc");
 
     if (
       !variantId ||
@@ -40,16 +38,12 @@ const createCodOrder = async (req, res) => {
         .json({ success: false, message: "Missing required fields." });
     }
 
-    // Here you'd place the order using Shopify Admin API or any other system
-    // For mockup:
     const response = await axios.post(
       `https://${shop}/admin/api/2024-04/orders.json`,
       {
         order: {
           financial_status: "pending", // For COD
-          send_receipt: true, // Send SMS if phone is present
-          phone: phone, // Used for SMS updates
-          payment_gateway_names: ["cash_on_delivery"],
+          send_receipt: true, // To trigger SMS if configured
           customer: {
             first_name: name,
             phone: phone,
@@ -82,43 +76,6 @@ const createCodOrder = async (req, res) => {
           ],
           tags: "COD",
         },
-        // order: {
-        //   financial_status: "pending",
-        //   send_receipt: true,
-        //   email: null,
-        //   phone: phone,
-        //   customer: {
-        //     first_name: name,
-        //     phone: phone,
-        //   },
-        //   shipping_address: {
-        //     first_name: name,
-        //     address1: address,
-        //     address2: landmark || "",
-        //     city,
-        //     province,
-        //     zip,
-        //     country: "India",
-        //     phone: phone,
-        //   },
-        //   billing_address: {
-        //     first_name: name,
-        //     address1: address,
-        //     address2: landmark || "",
-        //     city,
-        //     province,
-        //     zip,
-        //     country: "India",
-        //     phone: phone,
-        //   },
-        //   line_items: [
-        //     {
-        //       variant_id: Number(variantId),
-        //       quantity: Number(quantity),
-        //     },
-        //   ],
-        //   tags: "COD",
-        // },
       },
       {
         headers: {
@@ -130,8 +87,12 @@ const createCodOrder = async (req, res) => {
 
     res.status(200).json({ success: true, order: response.data.order });
   } catch (error) {
-    console.error("COD Order Error:", error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error("COD Order Error:", error?.response?.data || error.message);
+    res.status(500).json({
+      success: false,
+      message: "Order creation failed",
+      details: error?.response?.data || error.message,
+    });
   }
 };
 
