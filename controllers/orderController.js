@@ -85,6 +85,9 @@ const createCodOrder = async (req, res) => {
       }
     }
 
+    const fullAddress = `${address}${
+      landmark ? ", " + landmark : ""
+    }, ${city}, ${province} - ${zip}, India`;
     // ✅ Step 2: Create the actual COD order with address + phone
     const orderPayload = {
       order: {
