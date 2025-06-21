@@ -16,17 +16,16 @@ const createCodOrder = async (req, res) => {
       zip,
     } = req.body;
 
-    // Step 1: Validate input
     if (
       !shop ||
       !name ||
       !phone ||
       !address ||
-      !province ||
       !city ||
+      !province ||
+      !zip ||
       !variantId ||
-      !quantity ||
-      !zip
+      !quantity
     ) {
       return res.status(400).json({
         success: false,
@@ -34,75 +33,39 @@ const createCodOrder = async (req, res) => {
       });
     }
 
-    // Step 2: Get access token
     const accessToken = await getAccessToken(shop);
     if (!accessToken) {
       return res.status(500).json({
         success: false,
-        message: "Access token not found for the shop.",
+        message: "Access token not found",
       });
     }
 
-    // Step 3: Try to find an existing customer by phone
-    let customerId = null;
-    try {
-      const searchResponse = await axios.get(
-        `https://${shop}/admin/api/2024-04/customers/search.json?query=phone:${encodeURIComponent(
-          phone
-        )}`,
-        {
-          headers: {
-            "X-Shopify-Access-Token": accessToken,
-          },
-        }
-      );
-
-      const customers = searchResponse.data.customers;
-      if (customers.length > 0) {
-        customerId = customers[0].id;
-      }
-    } catch (err) {
-      console.warn(
-        "Customer search failed:",
-        err?.response?.data || err.message
-      );
-    }
-
-    // Step 4: Build order payload
     const orderPayload = {
       order: {
-        financial_status: "pending",
+        financial_status: "pending", // COD
         fulfillment_status: "unfulfilled",
-        send_receipt: true,
+        send_receipt: false,
         tags: "COD",
-        phone: phone,
-        ...(customerId
-          ? { customer: { id: customerId } }
-          : {
-              customer: {
-                first_name: name,
-                phone: phone,
-              },
-            }),
         shipping_address: {
           first_name: name,
           address1: address,
           address2: landmark || "",
-          city: city,
-          province: province,
-          zip: zip,
+          city,
+          province,
+          zip,
           country: "India",
-          phone: phone,
+          phone,
         },
         billing_address: {
           first_name: name,
           address1: address,
           address2: landmark || "",
-          city: city,
-          province: province,
-          zip: zip,
+          city,
+          province,
+          zip,
           country: "India",
-          phone: phone,
+          phone,
         },
         line_items: [
           {
@@ -110,10 +73,11 @@ const createCodOrder = async (req, res) => {
             quantity: Number(quantity),
           },
         ],
+        phone,
+        email: null, // No email
       },
     };
 
-    // Step 5: Send order creation request
     const response = await axios.post(
       `https://${shop}/admin/api/2024-04/orders.json`,
       orderPayload,
@@ -125,7 +89,6 @@ const createCodOrder = async (req, res) => {
       }
     );
 
-    // Step 6: Respond with success
     return res.status(200).json({
       success: true,
       message: "COD order created successfully.",
@@ -135,7 +98,7 @@ const createCodOrder = async (req, res) => {
     console.error("COD Order Error:", error?.response?.data || error.message);
     return res.status(500).json({
       success: false,
-      message: "Order creation failed.",
+      message: "Order creation failed",
       details: error?.response?.data || error.message,
     });
   }
