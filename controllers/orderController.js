@@ -30,8 +30,7 @@ const gqlCustomerSearch = async (shop, accessToken, phone) => {
 
     const customerEdges = response.data.data?.customers?.edges;
     if (customerEdges.length > 0) {
-      const customerId = customerEdges[0].node.id;
-      return customerId;
+      return customerEdges[0].node.id;
     }
 
     return null;
@@ -39,6 +38,56 @@ const gqlCustomerSearch = async (shop, accessToken, phone) => {
     console.error(
       "GraphQL customer search failed:",
       err?.response?.data || err.message
+    );
+    return null;
+  }
+};
+
+const gqlCustomerCreate = async (shop, accessToken, name, phone) => {
+  const mutation = `
+    mutation customerCreate($input: CustomerInput!) {
+      customerCreate(input: $input) {
+        customer {
+          id
+          phone
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+  `;
+
+  const input = {
+    firstName: name,
+    phone: phone,
+  };
+
+  try {
+    const response = await axios.post(
+      `https://${shop}/admin/api/2024-04/graphql.json`,
+      { query: mutation, variables: { input } },
+      {
+        headers: {
+          "X-Shopify-Access-Token": accessToken,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const result = response.data.data.customerCreate;
+
+    if (result.userErrors.length > 0) {
+      console.warn("Customer creation errors:", result.userErrors);
+      return null;
+    }
+
+    return result.customer.id;
+  } catch (error) {
+    console.error(
+      "Customer creation failed:",
+      error.response?.data || error.message
     );
     return null;
   }
@@ -81,20 +130,19 @@ const createCodOrder = async (req, res) => {
         .json({ success: false, message: "Missing required fields." });
     }
 
-    let customerId = null;
+    let customerId = await gqlCustomerSearch(shop, accessToken, phone);
 
-    const customerIdnew = await gqlCustomerSearch(shop, accessToken, phone);
-    console.log(customerIdnew, "customerIdnew");
+    if (!customerId) {
+      customerId = await gqlCustomerCreate(shop, accessToken, name, phone);
+    }
 
-    // Build the order payload
     const orderPayload = {
       order: {
-        financial_status: "pending", // COD = pending
+        financial_status: "pending",
         send_receipt: true,
         tags: "COD",
         payment_gateway_names: ["cash_on_delivery"],
-        phone,
-        ...(customerId && { customer: { id: customerId } }),
+        customer: customerId ? { id: customerId } : undefined,
         shipping_address: {
           first_name: name,
           address1: address,
@@ -124,7 +172,6 @@ const createCodOrder = async (req, res) => {
       },
     };
 
-    // Create the order
     const createOrderResponse = await axios.post(
       `https://${shop}/admin/api/2024-04/orders.json`,
       orderPayload,
