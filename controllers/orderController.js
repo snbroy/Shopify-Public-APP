@@ -41,12 +41,17 @@ const createCodOrder = async (req, res) => {
       });
     }
 
+    // Generate a dummy email from phone (Shopify needs email for full info)
+    const dummyEmail = `cod_${phone.replace(/\D/g, "")}@codorder.local`;
+
     const orderPayload = {
       order: {
-        financial_status: "pending", // COD
+        financial_status: "pending",
         fulfillment_status: "unfulfilled",
         send_receipt: false,
         tags: "COD",
+        email: dummyEmail, // <-- Forces Shopify to capture customer
+        phone: phone,
         shipping_address: {
           first_name: name,
           address1: address,
@@ -73,8 +78,6 @@ const createCodOrder = async (req, res) => {
             quantity: Number(quantity),
           },
         ],
-        phone,
-        email: null, // No email
       },
     };
 
