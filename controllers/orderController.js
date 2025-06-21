@@ -48,8 +48,8 @@ const createCodOrder = async (req, res) => {
         order: {
           financial_status: "pending", // For COD
           send_receipt: true, // Send SMS if phone is present
-          email: null, // Email is explicitly null
           phone: phone, // Used for SMS updates
+          payment_gateway_names: ["cash_on_delivery"],
           customer: {
             first_name: name,
             phone: phone,
