@@ -123,6 +123,21 @@ const createCodOrder = async (req, res) => {
             quantity: Number(quantity),
           },
         ],
+        note: "COD Order from custom form",
+        note_attributes: [
+          {
+            name: "Customer Name",
+            value: name,
+          },
+          {
+            name: "Phone",
+            value: phone,
+          },
+          {
+            name: "Address",
+            value: fullAddress,
+          },
+        ],
       },
     };
 
