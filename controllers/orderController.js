@@ -16,61 +16,93 @@ const createCodOrder = async (req, res) => {
       zip,
     } = req.body;
 
-    // Check access token
-    const accessToken = await getAccessToken(shop);
-    if (!accessToken) {
-      return res
-        .status(500)
-        .json({ success: false, message: "Access token not found" });
-    }
-
-    // Validate inputs
+    // Step 1: Validate input
     if (
-      !variantId ||
-      !quantity ||
+      !shop ||
       !name ||
       !phone ||
       !address ||
-      !city ||
       !province ||
+      !city ||
+      !variantId ||
+      !quantity ||
       !zip
     ) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Missing required fields." });
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields.",
+      });
     }
 
-    // Prepare the order data
+    // Step 2: Get access token
+    const accessToken = await getAccessToken(shop);
+    if (!accessToken) {
+      return res.status(500).json({
+        success: false,
+        message: "Access token not found for the shop.",
+      });
+    }
+
+    // Step 3: Try to find an existing customer by phone
+    let customerId = null;
+    try {
+      const searchResponse = await axios.get(
+        `https://${shop}/admin/api/2024-04/customers/search.json?query=phone:${encodeURIComponent(
+          phone
+        )}`,
+        {
+          headers: {
+            "X-Shopify-Access-Token": accessToken,
+          },
+        }
+      );
+
+      const customers = searchResponse.data.customers;
+      if (customers.length > 0) {
+        customerId = customers[0].id;
+      }
+    } catch (err) {
+      console.warn(
+        "Customer search failed:",
+        err?.response?.data || err.message
+      );
+    }
+
+    // Step 4: Build order payload
     const orderPayload = {
       order: {
-        financial_status: "pending", // COD, not paid
+        financial_status: "pending",
         fulfillment_status: "unfulfilled",
         send_receipt: true,
         tags: "COD",
         phone: phone,
-        customer: {
-          first_name: name,
-          phone: phone,
-        },
+        ...(customerId
+          ? { customer: { id: customerId } }
+          : {
+              customer: {
+                first_name: name,
+                phone: phone,
+              },
+            }),
         shipping_address: {
           first_name: name,
           address1: address,
           address2: landmark || "",
-          city,
-          province,
-          zip,
+          city: city,
+          province: province,
+          zip: zip,
           country: "India",
-          phone,
+          phone: phone,
         },
         billing_address: {
           first_name: name,
           address1: address,
           address2: landmark || "",
-          city,
-          province,
-          zip,
+          city: city,
+          province: province,
+          zip: zip,
           country: "India",
-          phone,
+          phone: phone,
         },
         line_items: [
           {
@@ -81,8 +113,8 @@ const createCodOrder = async (req, res) => {
       },
     };
 
-    // Create the order
-    const shopifyResponse = await axios.post(
+    // Step 5: Send order creation request
+    const response = await axios.post(
       `https://${shop}/admin/api/2024-04/orders.json`,
       orderPayload,
       {
@@ -93,16 +125,17 @@ const createCodOrder = async (req, res) => {
       }
     );
 
-    // Return success
-    res.status(200).json({
+    // Step 6: Respond with success
+    return res.status(200).json({
       success: true,
-      order: shopifyResponse.data.order,
+      message: "COD order created successfully.",
+      order: response.data.order,
     });
   } catch (error) {
     console.error("COD Order Error:", error?.response?.data || error.message);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: "Order creation failed",
+      message: "Order creation failed.",
       details: error?.response?.data || error.message,
     });
   }
