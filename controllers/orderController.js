@@ -12,7 +12,6 @@ const createCodOrder = async (req, res) => {
       shop,
       name,
       phone,
-      phoneCode,
       countryCode,
       address,
       landmark,
