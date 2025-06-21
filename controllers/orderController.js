@@ -47,9 +47,9 @@ const createCodOrder = async (req, res) => {
       {
         order: {
           financial_status: "pending", // For COD
-          send_receipt: true,
-          email: null, // Email is null
-          phone: phone, // Needed for order confirmation
+          send_receipt: true, // Send SMS if phone is present
+          email: null, // Email is explicitly null
+          phone: phone, // Used for SMS updates
           customer: {
             first_name: name,
             phone: phone,
@@ -58,9 +58,9 @@ const createCodOrder = async (req, res) => {
             first_name: name,
             address1: address,
             address2: landmark || "",
-            city,
-            province,
-            zip,
+            city: city,
+            province: province,
+            zip: zip,
             country: "India",
             phone: phone,
           },
@@ -68,9 +68,9 @@ const createCodOrder = async (req, res) => {
             first_name: name,
             address1: address,
             address2: landmark || "",
-            city,
-            province,
-            zip,
+            city: city,
+            province: province,
+            zip: zip,
             country: "India",
             phone: phone,
           },
@@ -82,6 +82,43 @@ const createCodOrder = async (req, res) => {
           ],
           tags: "COD",
         },
+        // order: {
+        //   financial_status: "pending",
+        //   send_receipt: true,
+        //   email: null,
+        //   phone: phone,
+        //   customer: {
+        //     first_name: name,
+        //     phone: phone,
+        //   },
+        //   shipping_address: {
+        //     first_name: name,
+        //     address1: address,
+        //     address2: landmark || "",
+        //     city,
+        //     province,
+        //     zip,
+        //     country: "India",
+        //     phone: phone,
+        //   },
+        //   billing_address: {
+        //     first_name: name,
+        //     address1: address,
+        //     address2: landmark || "",
+        //     city,
+        //     province,
+        //     zip,
+        //     country: "India",
+        //     phone: phone,
+        //   },
+        //   line_items: [
+        //     {
+        //       variant_id: Number(variantId),
+        //       quantity: Number(quantity),
+        //     },
+        //   ],
+        //   tags: "COD",
+        // },
       },
       {
         headers: {
