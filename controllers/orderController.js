@@ -27,7 +27,6 @@ const createCodOrder = async (req, res) => {
       !shop ||
       !name ||
       !phone ||
-      !phoneCode ||
       !countryCode ||
       !address ||
       !city ||
@@ -41,8 +40,6 @@ const createCodOrder = async (req, res) => {
         message: "Missing required fields.",
       });
     }
-
-    const fullPhone = phone.startsWith("+") ? phone : `${phoneCode}${phone}`;
 
     if (!isValidPhone(fullPhone)) {
       return res.status(400).json({
@@ -74,7 +71,7 @@ const createCodOrder = async (req, res) => {
         send_receipt: false,
         tags: "COD",
         email: dummyEmail,
-        phone: fullPhone,
+        phone: phone,
         line_items: [
           {
             variant_id: Number(variantId),
@@ -89,7 +86,7 @@ const createCodOrder = async (req, res) => {
           },
           {
             name: "Phone",
-            value: fullPhone,
+            value: phone,
           },
           {
             name: "Country Code",
