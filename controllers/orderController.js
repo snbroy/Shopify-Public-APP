@@ -1,7 +1,7 @@
 import axios from "axios";
 import { getAccessToken } from "../models/shopModel.js";
 
-const createCodOrderGraphql = async (req, res) => {
+const createCodOrder = async (req, res) => {
   try {
     const {
       shop,
@@ -20,29 +20,119 @@ const createCodOrderGraphql = async (req, res) => {
     if (!accessToken) {
       return res
         .status(500)
-        .json({ error: true, message: "Access token missing" });
+        .json({ error: true, message: "Access token not found" });
     }
 
-    // Step 1: Search customer by phone
-    const searchQuery = `
-      query ($query: String!) {
-        customers(first: 1, query: $query) {
-          edges {
-            node {
-              id
-              phone
+    // Validate input
+    if (
+      !variantId ||
+      !quantity ||
+      !name ||
+      !phone ||
+      !address ||
+      !city ||
+      !province ||
+      !zip
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing required fields." });
+    }
+
+    const graphqlUrl = `https://${shop}/admin/api/2024-04/graphql.json`;
+
+    // Try to find customer by phone
+    let customerId = null;
+    try {
+      const searchResponse = await axios.post(
+        graphqlUrl,
+        {
+          query: `
+            query ($query: String!) {
+              customers(first: 1, query: $query) {
+                edges {
+                  node {
+                    id
+                    firstName
+                  }
+                }
+              }
+            }
+          `,
+          variables: {
+            query: `phone:${phone}`,
+          },
+        },
+        {
+          headers: {
+            "X-Shopify-Access-Token": accessToken,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const data = searchResponse.data;
+
+      if (data?.data?.customers?.edges?.length > 0) {
+        customerId = data.data.customers.edges[0].node.id;
+      }
+    } catch (err) {
+      console.warn(
+        "Customer lookup failed (likely due to no protected data access). Continuing without customerId."
+      );
+    }
+
+    // Place the order
+    const orderResponse = await axios.post(
+      graphqlUrl,
+      {
+        query: `
+          mutation orderCreate($input: OrderInput!) {
+            orderCreate(input: $input) {
+              order {
+                id
+                name
+              }
+              userErrors {
+                field
+                message
+              }
             }
           }
-        }
-      }
-    `;
-
-    const searchResponse = await axios.post(
-      `https://${shop}/admin/api/2024-04/graphql.json`,
-      {
-        query: searchQuery,
+        `,
         variables: {
-          query: `phone:${phone}`,
+          input: {
+            lineItems: [
+              {
+                variantId: `gid://shopify/ProductVariant/${variantId}`,
+                quantity: parseInt(quantity),
+              },
+            ],
+            financialStatus: "PENDING",
+            paymentGatewayNames: ["cash_on_delivery"],
+            tags: ["COD"],
+            customer: customerId ? { id: customerId } : undefined,
+            shippingAddress: {
+              firstName: name,
+              address1: address,
+              address2: landmark || "",
+              city,
+              province,
+              zip,
+              country: "India",
+              phone,
+            },
+            billingAddress: {
+              firstName: name,
+              address1: address,
+              address2: landmark || "",
+              city,
+              province,
+              zip,
+              country: "India",
+              phone,
+            },
+          },
         },
       },
       {
@@ -53,97 +143,24 @@ const createCodOrderGraphql = async (req, res) => {
       }
     );
 
-    const customerEdges = searchResponse.data.data.customers.edges;
-    const customerId = customerEdges.length ? customerEdges[0].node.id : null;
-
-    // Step 2: Create order
-    const orderMutation = `
-      mutation orderCreate($input: OrderInput!) {
-        orderCreate(input: $input) {
-          order {
-            id
-            name
-          }
-          userErrors {
-            field
-            message
-          }
-        }
-      }
-    `;
-
-    const input = {
-      lineItems: [
-        {
-          variantId: `gid://shopify/ProductVariant/${variantId}`,
-          quantity: parseInt(quantity),
-        },
-      ],
-      financialStatus: "PENDING",
-      tags: ["COD"],
-      billingAddress: {
-        address1: address,
-        address2: landmark || "",
-        city,
-        province,
-        zip,
-        country: "India",
-        firstName: name,
-        phone,
-      },
-      shippingAddress: {
-        address1: address,
-        address2: landmark || "",
-        city,
-        province,
-        zip,
-        country: "India",
-        firstName: name,
-        phone,
-      },
-      customerId: customerId || undefined,
-    };
-
-    const createResponse = await axios.post(
-      `https://${shop}/admin/api/2024-04/graphql.json`,
-      {
-        query: orderMutation,
-        variables: { input },
-      },
-      {
-        headers: {
-          "X-Shopify-Access-Token": accessToken,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    const result = createResponse.data.data.orderCreate;
-
-    if (result.userErrors.length) {
-      return res.status(400).json({
-        success: false,
-        message: "Order creation error",
-        errors: result.userErrors,
-      });
+    const orderData = orderResponse.data.data.orderCreate;
+    if (orderData.userErrors?.length) {
+      return res
+        .status(400)
+        .json({ success: false, errors: orderData.userErrors });
     }
 
-    return res.status(200).json({
-      success: true,
-      orderId: result.order.id,
-      orderName: result.order.name,
-    });
+    res.status(200).json({ success: true, order: orderData.order });
   } catch (error) {
-    console.error(
-      "Error placing order:",
-      error?.response?.data || error.message
-    );
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-      details: error?.response?.data || error.message,
-    });
+    console.error("Error placing order:", error.message);
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Internal Server Error",
+        error: error.message,
+      });
   }
 };
 
-export default createCodOrderGraphql;
+export default createCodOrder;
