@@ -16,6 +16,7 @@ const createCodOrder = async (req, res) => {
       zip,
     } = req.body;
 
+    // Basic validation
     if (
       !shop ||
       !name ||
@@ -41,42 +42,80 @@ const createCodOrder = async (req, res) => {
       });
     }
 
-    // 🛠️ Dummy email to satisfy Shopify
+    // 🛠 Generate unique dummy email from phone
     const dummyEmail = `cod_${phone.replace(/\D/g, "")}@codorder.local`;
 
-    // ✅ Add customer object inline
+    let customerId;
+
+    // ✅ Step 1: Try to create the customer (safe - no phone)
+    try {
+      const customerRes = await axios.post(
+        `https://${shop}/admin/api/2024-04/customers.json`,
+        {
+          customer: {
+            first_name: name,
+            email: dummyEmail,
+            tags: "COD-Customer",
+            verified_email: true,
+          },
+        },
+        {
+          headers: {
+            "X-Shopify-Access-Token": accessToken,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      customerId = customerRes.data.customer.id;
+    } catch (err) {
+      const msg = err?.response?.data?.errors?.email;
+      if (msg && msg[0]?.includes("has already been taken")) {
+        // ✅ If email already exists, get that customer ID
+        const searchRes = await axios.get(
+          `https://${shop}/admin/api/2024-04/customers/search.json?query=email:${dummyEmail}`,
+          {
+            headers: {
+              "X-Shopify-Access-Token": accessToken,
+            },
+          }
+        );
+        customerId = searchRes.data.customers[0]?.id;
+      } else {
+        throw err;
+      }
+    }
+
+    // ✅ Step 2: Create the actual COD order with address + phone
     const orderPayload = {
       order: {
         financial_status: "pending",
         fulfillment_status: "unfulfilled",
         send_receipt: false,
         tags: "COD",
+        customer: {
+          id: customerId,
+        },
         email: dummyEmail,
         phone: phone,
-        customer: {
-          first_name: name,
-          email: dummyEmail,
-          phone: phone,
-        },
         shipping_address: {
           first_name: name,
           address1: address,
           address2: landmark || "",
-          city: city,
-          province: province,
-          zip: zip,
+          city,
+          province,
+          zip,
           country: "India",
-          phone: phone,
+          phone,
         },
         billing_address: {
           first_name: name,
           address1: address,
           address2: landmark || "",
-          city: city,
-          province: province,
-          zip: zip,
+          city,
+          province,
+          zip,
           country: "India",
-          phone: phone,
+          phone,
         },
         line_items: [
           {
