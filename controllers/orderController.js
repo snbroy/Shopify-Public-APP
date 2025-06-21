@@ -41,7 +41,7 @@ const createCodOrder = async (req, res) => {
       });
     }
 
-    if (!isValidPhone(fullPhone)) {
+    if (!isValidPhone(phone)) {
       return res.status(400).json({
         success: false,
         message: "Invalid phone number format.",
@@ -57,7 +57,7 @@ const createCodOrder = async (req, res) => {
     }
 
     // ✅ Dummy email from phone (for uniqueness)
-    const dummyEmail = `cod_${fullPhone.replace(/\D/g, "")}@codly.app`;
+    const dummyEmail = `cod_${phone.replace(/\D/g, "")}@codly.app`;
 
     // ✅ Build readable full address
     const fullAddress = `${address}${
