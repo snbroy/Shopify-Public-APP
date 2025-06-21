@@ -23,7 +23,6 @@ const createCodOrder = async (req, res) => {
         .json({ error: true, message: "Access token not found" });
     }
 
-    // Validate input
     if (
       !variantId ||
       !quantity ||
@@ -41,7 +40,7 @@ const createCodOrder = async (req, res) => {
 
     const graphqlUrl = `https://${shop}/admin/api/2024-04/graphql.json`;
 
-    // Try to find customer by phone
+    // Optional: Search for existing customer by phone
     let customerId = null;
     try {
       const searchResponse = await axios.post(
@@ -53,7 +52,6 @@ const createCodOrder = async (req, res) => {
                 edges {
                   node {
                     id
-                    firstName
                   }
                 }
               }
@@ -71,14 +69,18 @@ const createCodOrder = async (req, res) => {
         }
       );
 
-      const data = searchResponse.data;
-
-      if (data?.data?.customers?.edges?.length > 0) {
-        customerId = data.data.customers.edges[0].node.id;
+      if (
+        searchResponse.data &&
+        searchResponse.data.data &&
+        searchResponse.data.data.customers &&
+        searchResponse.data.data.customers.edges.length > 0
+      ) {
+        customerId = searchResponse.data.data.customers.edges[0].node.id;
       }
     } catch (err) {
       console.warn(
-        "Customer lookup failed (likely due to no protected data access). Continuing without customerId."
+        "Customer search skipped (no protected data access):",
+        err.response?.data?.errors || err.message
       );
     }
 
@@ -111,7 +113,7 @@ const createCodOrder = async (req, res) => {
             financialStatus: "PENDING",
             paymentGatewayNames: ["cash_on_delivery"],
             tags: ["COD"],
-            customer: customerId ? { id: customerId } : undefined,
+            ...(customerId && { customer: { id: customerId } }),
             shippingAddress: {
               firstName: name,
               address1: address,
@@ -143,7 +145,27 @@ const createCodOrder = async (req, res) => {
       }
     );
 
-    const orderData = orderResponse.data.data.orderCreate;
+    const responseData = orderResponse.data;
+
+    // Handle GraphQL errors
+    if (responseData.errors) {
+      return res.status(400).json({
+        success: false,
+        message: "GraphQL error",
+        errors: responseData.errors,
+      });
+    }
+
+    const orderData = responseData.data?.orderCreate;
+    if (!orderData) {
+      return res
+        .status(500)
+        .json({
+          success: false,
+          message: "Order creation failed: no orderCreate response.",
+        });
+    }
+
     if (orderData.userErrors?.length) {
       return res
         .status(400)
