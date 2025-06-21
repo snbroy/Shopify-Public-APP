@@ -41,36 +41,42 @@ const createCodOrder = async (req, res) => {
       });
     }
 
-    // Generate a dummy email from phone (Shopify needs email for full info)
+    // 🛠️ Dummy email to satisfy Shopify
     const dummyEmail = `cod_${phone.replace(/\D/g, "")}@codorder.local`;
 
+    // ✅ Add customer object inline
     const orderPayload = {
       order: {
         financial_status: "pending",
         fulfillment_status: "unfulfilled",
         send_receipt: false,
         tags: "COD",
-        email: dummyEmail, // <-- Forces Shopify to capture customer
+        email: dummyEmail,
         phone: phone,
+        customer: {
+          first_name: name,
+          email: dummyEmail,
+          phone: phone,
+        },
         shipping_address: {
           first_name: name,
           address1: address,
           address2: landmark || "",
-          city,
-          province,
-          zip,
+          city: city,
+          province: province,
+          zip: zip,
           country: "India",
-          phone,
+          phone: phone,
         },
         billing_address: {
           first_name: name,
           address1: address,
           address2: landmark || "",
-          city,
-          province,
-          zip,
+          city: city,
+          province: province,
+          zip: zip,
           country: "India",
-          phone,
+          phone: phone,
         },
         line_items: [
           {
@@ -98,11 +104,13 @@ const createCodOrder = async (req, res) => {
       order: response.data.order,
     });
   } catch (error) {
-    console.error("COD Order Error:", error?.response?.data || error.message);
+    const errorDetails = error?.response?.data || error.message;
+    console.error("COD Order Error:", errorDetails);
+
     return res.status(500).json({
       success: false,
       message: "Order creation failed",
-      details: error?.response?.data || error.message,
+      details: errorDetails,
     });
   }
 };
