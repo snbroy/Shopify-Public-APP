@@ -1,27 +1,7 @@
 import axios from "axios";
 import { getAccessToken } from "../models/shopModel.js";
 
-const searchCustomer = async (shop, accessToken, phone) => {
-  try {
-    const response = await axios.get(
-      `https://${shop}/admin/api/2024-04/customers/search.json?query=phone:${encodeURIComponent(
-        phone
-      )}`,
-      {
-        headers: {
-          "X-Shopify-Access-Token": accessToken,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-    return response.data.customers?.[0]; // First matched customer if any
-  } catch (err) {
-    console.error("Customer search failed", err?.response?.data || err.message);
-    return null;
-  }
-};
-
-const createCodOrder = async (req, res) => {
+const createCodOrderGraphql = async (req, res) => {
   try {
     const {
       shop,
@@ -40,64 +20,29 @@ const createCodOrder = async (req, res) => {
     if (!accessToken) {
       return res
         .status(500)
-        .json({ error: true, message: "Access token not found" });
+        .json({ error: true, message: "Access token missing" });
     }
 
-    if (
-      !variantId ||
-      !quantity ||
-      !name ||
-      !phone ||
-      !address ||
-      !city ||
-      !province ||
-      !zip
-    ) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Missing required fields." });
-    }
+    // Step 1: Search customer by phone
+    const searchQuery = `
+      query ($query: String!) {
+        customers(first: 1, query: $query) {
+          edges {
+            node {
+              id
+              phone
+            }
+          }
+        }
+      }
+    `;
 
-    const existingCustomer = await searchCustomer(shop, accessToken, phone);
-
-    const response = await axios.post(
-      `https://${shop}/admin/api/2024-04/orders.json`,
+    const searchResponse = await axios.post(
+      `https://${shop}/admin/api/2024-04/graphql.json`,
       {
-        order: {
-          financial_status: "pending",
-          send_receipt: true,
-          phone: phone,
-          customer: existingCustomer
-            ? { id: existingCustomer.id }
-            : { first_name: name, phone },
-          shipping_address: {
-            first_name: name,
-            address1: address,
-            address2: landmark || "",
-            city,
-            province,
-            zip,
-            country: "India",
-            phone,
-          },
-          billing_address: {
-            first_name: name,
-            address1: address,
-            address2: landmark || "",
-            city,
-            province,
-            zip,
-            country: "India",
-            phone,
-          },
-          line_items: [
-            {
-              variant_id: Number(variantId),
-              quantity: Number(quantity),
-            },
-          ],
-          tags: "COD",
-          fulfillment_status: "unfulfilled",
+        query: searchQuery,
+        variables: {
+          query: `phone:${phone}`,
         },
       },
       {
@@ -108,15 +53,97 @@ const createCodOrder = async (req, res) => {
       }
     );
 
-    res.status(200).json({ success: true, order: response.data.order });
+    const customerEdges = searchResponse.data.data.customers.edges;
+    const customerId = customerEdges.length ? customerEdges[0].node.id : null;
+
+    // Step 2: Create order
+    const orderMutation = `
+      mutation orderCreate($input: OrderInput!) {
+        orderCreate(input: $input) {
+          order {
+            id
+            name
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
+
+    const input = {
+      lineItems: [
+        {
+          variantId: `gid://shopify/ProductVariant/${variantId}`,
+          quantity: parseInt(quantity),
+        },
+      ],
+      financialStatus: "PENDING",
+      tags: ["COD"],
+      billingAddress: {
+        address1: address,
+        address2: landmark || "",
+        city,
+        province,
+        zip,
+        country: "India",
+        firstName: name,
+        phone,
+      },
+      shippingAddress: {
+        address1: address,
+        address2: landmark || "",
+        city,
+        province,
+        zip,
+        country: "India",
+        firstName: name,
+        phone,
+      },
+      customerId: customerId || undefined,
+    };
+
+    const createResponse = await axios.post(
+      `https://${shop}/admin/api/2024-04/graphql.json`,
+      {
+        query: orderMutation,
+        variables: { input },
+      },
+      {
+        headers: {
+          "X-Shopify-Access-Token": accessToken,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const result = createResponse.data.data.orderCreate;
+
+    if (result.userErrors.length) {
+      return res.status(400).json({
+        success: false,
+        message: "Order creation error",
+        errors: result.userErrors,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      orderId: result.order.id,
+      orderName: result.order.name,
+    });
   } catch (error) {
-    console.error("COD Order Error:", error?.response?.data || error.message);
-    res.status(500).json({
+    console.error(
+      "Error placing order:",
+      error?.response?.data || error.message
+    );
+    return res.status(500).json({
       success: false,
-      message: "Order creation failed",
+      message: "Server error",
       details: error?.response?.data || error.message,
     });
   }
 };
 
-export default createCodOrder;
+export default createCodOrderGraphql;
