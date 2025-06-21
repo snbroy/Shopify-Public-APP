@@ -1,6 +1,26 @@
 import axios from "axios";
 import { getAccessToken } from "../models/shopModel.js";
 
+const searchCustomer = async (shop, accessToken, phone) => {
+  try {
+    const response = await axios.get(
+      `https://${shop}/admin/api/2024-04/customers/search.json?query=phone:${encodeURIComponent(
+        phone
+      )}`,
+      {
+        headers: {
+          "X-Shopify-Access-Token": accessToken,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    return response.data.customers?.[0]; // First matched customer if any
+  } catch (err) {
+    console.error("Customer search failed", err?.response?.data || err.message);
+    return null;
+  }
+};
+
 const createCodOrder = async (req, res) => {
   try {
     const {
@@ -38,6 +58,8 @@ const createCodOrder = async (req, res) => {
         .json({ success: false, message: "Missing required fields." });
     }
 
+    const existingCustomer = await searchCustomer(shop, accessToken, phone);
+
     const response = await axios.post(
       `https://${shop}/admin/api/2024-04/orders.json`,
       {
@@ -45,10 +67,9 @@ const createCodOrder = async (req, res) => {
           financial_status: "pending",
           send_receipt: true,
           phone: phone,
-          customer: {
-            first_name: name,
-            phone: phone,
-          },
+          customer: existingCustomer
+            ? { id: existingCustomer.id }
+            : { first_name: name, phone },
           shipping_address: {
             first_name: name,
             address1: address,
