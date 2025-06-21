@@ -42,31 +42,28 @@ const createCodOrder = async (req, res) => {
       `https://${shop}/admin/api/2024-04/orders.json`,
       {
         order: {
-          financial_status: "pending", // For COD
-          send_receipt: true, // To trigger SMS if configured
-          customer: {
-            first_name: name,
-            phone: phone,
-          },
+          financial_status: "pending",
+          send_receipt: true,
+          phone: phone,
           shipping_address: {
             first_name: name,
             address1: address,
             address2: landmark || "",
-            city: city,
-            province: province,
-            zip: zip,
+            city,
+            province,
+            zip,
             country: "India",
-            phone: phone,
+            phone,
           },
           billing_address: {
             first_name: name,
             address1: address,
             address2: landmark || "",
-            city: city,
-            province: province,
-            zip: zip,
+            city,
+            province,
+            zip,
             country: "India",
-            phone: phone,
+            phone,
           },
           line_items: [
             {
