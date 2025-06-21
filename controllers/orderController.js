@@ -50,6 +50,7 @@ const createCodOrder = async (req, res) => {
           customer: {
             first_name: name,
             phone: phone,
+            email: email ? email : "",
           },
           shipping_address: {
             first_name: name,
