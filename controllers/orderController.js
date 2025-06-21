@@ -2,7 +2,6 @@ import axios from "axios";
 import { getAccessToken } from "../models/shopModel.js";
 
 const isValidPhone = (phone) => {
-  // Basic validation: 7–15 digits (international format), optional +
   return /^\+?[0-9]{7,15}$/.test(phone);
 };
 
@@ -22,7 +21,6 @@ const createCodOrder = async (req, res) => {
       zip,
     } = req.body;
 
-    // ✅ Basic validation
     if (
       !shop ||
       !name ||
@@ -56,17 +54,14 @@ const createCodOrder = async (req, res) => {
       });
     }
 
-    // ✅ Dummy email from phone (for uniqueness)
     const dummyEmail = `cod_${phone.replace(/\D/g, "")}@codly.app`;
-
-    // ✅ Build readable full address
     const fullAddress = `${address}${
       landmark ? ", " + landmark : ""
     }, ${city}, ${province} - ${zip}, ${countryCode}`;
 
     const orderPayload = {
       order: {
-        financial_status: "pending", // COD
+        financial_status: "pending",
         fulfillment_status: "unfulfilled",
         send_receipt: false,
         tags: "COD",
@@ -80,22 +75,10 @@ const createCodOrder = async (req, res) => {
         ],
         note: "COD Order from custom form",
         note_attributes: [
-          {
-            name: "Customer Name",
-            value: name,
-          },
-          {
-            name: "Phone",
-            value: phone,
-          },
-          {
-            name: "Country Code",
-            value: countryCode,
-          },
-          {
-            name: "Address",
-            value: fullAddress,
-          },
+          { name: "Customer Name", value: name },
+          { name: "Phone", value: phone },
+          { name: "Country Code", value: countryCode },
+          { name: "Address", value: fullAddress },
         ],
       },
     };
@@ -111,10 +94,13 @@ const createCodOrder = async (req, res) => {
       }
     );
 
+    const order = response.data.order;
+
     return res.status(200).json({
       success: true,
       message: "COD order created successfully.",
-      order: response.data.order,
+      orderId: order.id,
+      orderStatusUrl: order.order_status_url,
     });
   } catch (error) {
     const errorDetails = error?.response?.data || error.message;
