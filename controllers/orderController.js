@@ -45,6 +45,10 @@ const createCodOrder = async (req, res) => {
           financial_status: "pending",
           send_receipt: true,
           phone: phone,
+          customer: {
+            first_name: name,
+            phone: phone,
+          },
           shipping_address: {
             first_name: name,
             address1: address,
@@ -72,6 +76,7 @@ const createCodOrder = async (req, res) => {
             },
           ],
           tags: "COD",
+          fulfillment_status: "unfulfilled",
         },
       },
       {
