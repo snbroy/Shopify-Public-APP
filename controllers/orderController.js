@@ -1,6 +1,49 @@
 import axios from "axios";
 import { getAccessToken } from "../models/shopModel.js";
 
+const gqlCustomerSearch = async (shop, accessToken, phone) => {
+  try {
+    const query = `
+      {
+        customers(first: 1, query: "phone:${phone}") {
+          edges {
+            node {
+              id
+              firstName
+              phone
+            }
+          }
+        }
+      }
+    `;
+
+    const response = await axios.post(
+      `https://${shop}/admin/api/2024-04/graphql.json`,
+      { query },
+      {
+        headers: {
+          "X-Shopify-Access-Token": accessToken,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const customerEdges = response.data.data?.customers?.edges;
+    if (customerEdges.length > 0) {
+      const customerId = customerEdges[0].node.id;
+      return customerId;
+    }
+
+    return null;
+  } catch (err) {
+    console.error(
+      "GraphQL customer search failed:",
+      err?.response?.data || err.message
+    );
+    return null;
+  }
+};
+
 const createCodOrder = async (req, res) => {
   try {
     const {
@@ -40,29 +83,8 @@ const createCodOrder = async (req, res) => {
 
     let customerId = null;
 
-    // Search customer by phone number
-    try {
-      const response = await axios.get(
-        `https://${shop}/admin/api/2024-04/customers/search.json?query=phone:${encodeURIComponent(
-          phone
-        )}`,
-        {
-          headers: {
-            "X-Shopify-Access-Token": accessToken,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (response.data.customers && response.data.customers.length > 0) {
-        customerId = response.data.customers[0].id;
-      }
-    } catch (err) {
-      console.warn(
-        "Customer search failed:",
-        err?.response?.data?.errors || err.message
-      );
-    }
+    const customerIdnew = await gqlCustomerSearch(shop, accessToken, phone);
+    console.log(customerIdnew, "customerIdnew");
 
     // Build the order payload
     const orderPayload = {
