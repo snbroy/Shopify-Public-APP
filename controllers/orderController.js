@@ -46,28 +46,26 @@ const createCodOrder = async (req, res) => {
       `https://${shop}/admin/api/2024-01/orders.json`,
       {
         order: {
-          financial_status: "pending",
-          customer: {
-            first_name: name,
-            phone: phone,
-            email: email ? email : "",
-          },
-          shipping_address: {
-            first_name: name,
-            address1: address,
-            address2: landmark || "",
-            city,
-            province,
-            zip,
-            country: "India",
-            phone,
-          },
           line_items: [
             {
               variant_id: Number(variantId),
               quantity: Number(quantity),
             },
           ],
+          financial_status: "pending", // Required for COD
+          customer: {
+            first_name: name,
+          },
+          shipping_address: {
+            first_name: name,
+            address1: address,
+            address2: landmark || "",
+            city: city,
+            province: province,
+            zip: zip,
+            phone: phone,
+            country: "India",
+          },
           tags: "COD",
         },
       },
