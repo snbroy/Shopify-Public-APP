@@ -11,7 +11,7 @@ const createCodOrder = async (req, res) => {
       shop,
       name,
       phone,
-      countryCode,
+      country,
       address,
       landmark,
       province,
@@ -25,7 +25,7 @@ const createCodOrder = async (req, res) => {
       !shop ||
       !name ||
       !phone ||
-      !countryCode ||
+      !country ||
       !address ||
       !city ||
       !province ||
@@ -57,7 +57,7 @@ const createCodOrder = async (req, res) => {
     const dummyEmail = `cod_${phone.replace(/\D/g, "")}@codly.app`;
     const fullAddress = `${address}${
       landmark ? ", " + landmark : ""
-    }, ${city}, ${province} - ${zip}, ${countryCode}`;
+    }, ${city}, ${province} - ${zip}, ${country}`;
 
     const orderPayload = {
       order: {
@@ -77,7 +77,7 @@ const createCodOrder = async (req, res) => {
         note_attributes: [
           { name: "Customer Name", value: name },
           { name: "Phone", value: phone },
-          { name: "Country Code", value: countryCode },
+          { name: "Country", value: country },
           { name: "Address", value: fullAddress },
         ],
       },
