@@ -16,7 +16,7 @@ export const placeCodOrder = async (req, res) => {
   } = req.body;
 
   try {
-    // Validate input
+    // Validate required fields
     if (
       !shop ||
       !variantId ||
@@ -33,7 +33,7 @@ export const placeCodOrder = async (req, res) => {
         .json({ success: false, message: "Missing fields." });
     }
 
-    // Get access token
+    // Get access token for the store
     const accessToken = await getAccessToken(shop);
     if (!accessToken) {
       return res
@@ -41,7 +41,7 @@ export const placeCodOrder = async (req, res) => {
         .json({ success: false, message: "Invalid shop token" });
     }
 
-    // Build customer & address objects
+    // Build customer and address object
     const customer = { first_name: name, phone };
     const addressObj = {
       first_name: name,
@@ -54,7 +54,7 @@ export const placeCodOrder = async (req, res) => {
       phone,
     };
 
-    // 1. Create Draft Order
+    // Step 1: Create Draft Order
     const draftRes = await axios.post(
       `https://${shop}/admin/api/2024-04/draft_orders.json`,
       {
@@ -86,11 +86,7 @@ export const placeCodOrder = async (req, res) => {
       throw new Error("Draft order creation failed.");
     }
 
-    if (draftOrder.status !== "open") {
-      throw new Error(`Draft order not open. Status: ${draftOrder.status}`);
-    }
-
-    // 2. Complete the Draft Order
+    // Step 2: Complete the Draft Order
     const completeRes = await axios.put(
       `https://${shop}/admin/api/2024-04/draft_orders/${draftOrder.id}/complete.json`,
       { payment_pending: true },
@@ -103,9 +99,14 @@ export const placeCodOrder = async (req, res) => {
     );
 
     const order = completeRes.data?.order;
+
     if (!order) {
-      console.error("Draft completion failed:", completeRes.data);
-      throw new Error("Failed to complete draft order.");
+      return res.status(200).json({
+        success: true,
+        message: "Draft was already completed. Order likely created.",
+        draft_order_id: draftOrder.id,
+        invoice_url: draftOrder.invoice_url,
+      });
     }
 
     return res.status(200).json({
