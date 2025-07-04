@@ -13,6 +13,7 @@ export const placeCodOrder = async (req, res) => {
     variantId,
     quantity,
     zip,
+    email,
   } = req.body;
 
   try {
