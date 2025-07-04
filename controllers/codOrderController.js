@@ -33,7 +33,6 @@ export const placeCodOrder = async (req, res) => {
         .json({ success: false, message: "Missing fields." });
     }
 
-    // Get access token for the store
     const accessToken = await getAccessToken(shop);
     if (!accessToken) {
       return res
@@ -41,7 +40,6 @@ export const placeCodOrder = async (req, res) => {
         .json({ success: false, message: "Invalid shop token" });
     }
 
-    // Build customer and address object
     const customer = { first_name: name, phone };
     const addressObj = {
       first_name: name,
@@ -86,7 +84,7 @@ export const placeCodOrder = async (req, res) => {
       throw new Error("Draft order creation failed.");
     }
 
-    // Step 2: Complete the Draft Order
+    // Step 2: Complete Draft Order
     const completeRes = await axios.put(
       `https://${shop}/admin/api/2024-04/draft_orders/${draftOrder.id}/complete.json`,
       { payment_pending: true },
@@ -98,22 +96,25 @@ export const placeCodOrder = async (req, res) => {
       }
     );
 
-    console.log(completeRes.data, "completeRes");
-    const order = completeRes.data?.order;
+    const order = completeRes?.data?.order;
 
     if (!order) {
+      // If no order object returned, return draft invoice as fallback
       return res.status(200).json({
         success: true,
-        message: "Draft was already completed. Order likely created.",
+        message: "Draft order completed, but no order returned.",
         draft_order_id: draftOrder.id,
         invoice_url: draftOrder.invoice_url,
       });
     }
 
+    // Final success response
     return res.status(200).json({
       success: true,
       message: "COD Order placed successfully",
-      order,
+      order_id: order.id,
+      order_number: order.order_number,
+      thank_you_url: order.order_status_url,
     });
   } catch (err) {
     console.error("COD Order Error:", err?.response?.data || err.message);
