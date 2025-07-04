@@ -13,9 +13,11 @@ export const placeCodOrder = async (req, res) => {
     variantId,
     quantity,
     zip,
+    email, // optional
   } = req.body;
 
   try {
+    // Basic field validation
     if (
       !shop ||
       !variantId ||
@@ -27,21 +29,24 @@ export const placeCodOrder = async (req, res) => {
       !province ||
       !zip
     ) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Missing fields." });
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields.",
+      });
     }
 
     const accessToken = await getAccessToken(shop);
     if (!accessToken) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Invalid shop token" });
+      return res.status(401).json({
+        success: false,
+        message: "Access token not found or invalid shop.",
+      });
     }
 
     const customer = {
       first_name: name,
       phone,
+      ...(email && { email }),
     };
 
     const addressObj = {
@@ -55,7 +60,7 @@ export const placeCodOrder = async (req, res) => {
       phone,
     };
 
-    // 1. Create Draft Order
+    // Step 1: Create Draft Order
     const draftRes = await axios.post(
       `https://${shop}/admin/api/2024-04/draft_orders.json`,
       {
@@ -82,13 +87,16 @@ export const placeCodOrder = async (req, res) => {
       }
     );
 
-    const draftOrderId = draftRes.data.draft_order.id;
+    const draftOrderId = draftRes.data?.draft_order?.id;
+    if (!draftOrderId) {
+      throw new Error("Draft order ID not found.");
+    }
 
-    // 2. Complete Draft Order to create real order
+    // Step 2: Complete Draft Order to place real order
     const completeRes = await axios.put(
       `https://${shop}/admin/api/2024-04/draft_orders/${draftOrderId}/complete.json`,
       {
-        payment_pending: true,
+        payment_pending: true, // Mark as COD
       },
       {
         headers: {
@@ -98,18 +106,27 @@ export const placeCodOrder = async (req, res) => {
       }
     );
 
+    const finalOrder = completeRes.data?.order;
+
+    if (!finalOrder) {
+      throw new Error("Failed to complete draft order.");
+    }
+
     return res.status(200).json({
       success: true,
-      message: "COD Order created",
-      order1: completeRes,
-      order: completeRes.data.order,
+      message: "COD order successfully created.",
+      order: finalOrder,
     });
   } catch (err) {
     console.error("COD order error:", err?.response?.data || err.message);
+
     return res.status(500).json({
       success: false,
       message: "Failed to create COD order",
-      error: err?.response?.data || err.message,
+      error:
+        err?.response?.data?.errors ||
+        err?.response?.data?.error ||
+        err.message,
     });
   }
 };
