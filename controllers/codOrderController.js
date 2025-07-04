@@ -19,6 +19,7 @@ export const placeCodOrder = async (req, res) => {
     // Validate required fields
     if (
       !shop ||
+      !email ||
       !variantId ||
       !quantity ||
       !name ||
@@ -40,7 +41,13 @@ export const placeCodOrder = async (req, res) => {
         .json({ success: false, message: "Invalid shop token" });
     }
 
-    const customer = { first_name: name, phone };
+    // const customer = { first_name: name, phone };
+    const dummyEmail = `cod-${phone.replace(/\D/g, "")}@trazoonow.in`;
+    const customer = {
+      first_name: name,
+      phone,
+      email: email ? email : dummyEmail,
+    };
     const addressObj = {
       first_name: name,
       address1: address,
