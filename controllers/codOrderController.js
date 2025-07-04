@@ -17,6 +17,7 @@ export const placeCodOrder = async (req, res) => {
   } = req.body;
 
   try {
+    // Step 0: Validate Inputs
     if (
       !shop ||
       !variantId ||
@@ -28,21 +29,24 @@ export const placeCodOrder = async (req, res) => {
       !province ||
       !zip
     ) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Missing fields." });
+      return res.status(400).json({
+        success: false,
+        message: "Missing fields in request.",
+      });
     }
 
+    // Step 1: Get Access Token
     const accessToken = await getAccessToken(shop);
     if (!accessToken) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Invalid shop token" });
+      return res.status(401).json({
+        success: false,
+        message: "Invalid shop token",
+      });
     }
 
+    // Step 2: Prepare customer & address
     const sanitizedPhone = phone.replace(/\D/g, "");
-    const dummyEmail = `cod-${sanitizedPhone}@trazoonow.in`;
-    const customerEmail = email?.trim() || dummyEmail;
+    const customerEmail = email?.trim() || `cod-${sanitizedPhone}@trazoonow.in`;
 
     const customer = {
       first_name: name,
@@ -61,7 +65,7 @@ export const placeCodOrder = async (req, res) => {
       phone,
     };
 
-    // Step 1: Create Draft Order
+    // Step 3: Create Draft Order
     const draftRes = await axios.post(
       `https://${shop}/admin/api/2024-04/draft_orders.json`,
       {
@@ -72,9 +76,9 @@ export const placeCodOrder = async (req, res) => {
               quantity: Number(quantity),
             },
           ],
+          customer,
           email: customerEmail,
           phone: phone,
-          customer,
           shipping_address: addressObj,
           billing_address: addressObj,
           tags: "COD",
@@ -95,7 +99,7 @@ export const placeCodOrder = async (req, res) => {
       throw new Error("Draft order creation failed.");
     }
 
-    // Step 2: Complete the Draft Order
+    // Step 4: Complete Draft Order (convert to real order)
     let order = null;
     try {
       const completeRes = await axios.put(
@@ -110,13 +114,13 @@ export const placeCodOrder = async (req, res) => {
       );
       order = completeRes?.data?.order;
     } catch (completeErr) {
-      console.warn("Draft might already be completed:", completeErr.message);
+      console.warn("Draft may already be completed:", completeErr.message);
     }
 
-    // Step 3: If no order in response, fetch recent orders to get it
+    // Step 5: Fallback - Find Order If Not Returned in Response
     if (!order) {
       const recentOrdersRes = await axios.get(
-        `https://${shop}/admin/api/2024-04/orders.json?limit=5&status=any`,
+        `https://${shop}/admin/api/2024-04/orders.json?limit=5&status=any&fields=id,order_number,order_status_url,note,tags`,
         {
           headers: {
             "X-Shopify-Access-Token": accessToken,
@@ -125,28 +129,29 @@ export const placeCodOrder = async (req, res) => {
         }
       );
 
-      const match = recentOrdersRes.data.orders.find(
+      const matched = recentOrdersRes.data.orders.find(
         (o) => o.tags?.includes("COD") && o.note === "COD Draft Order"
       );
 
-      if (!match) {
+      if (!matched) {
         return res.status(200).json({
           success: true,
-          message: "Draft completed, order created but could not locate it.",
+          message: "Order may have been created, but could not locate it.",
           draft_order_id: draftOrder.id,
           invoice_url: draftOrder.invoice_url,
         });
       }
 
-      order = match;
+      order = matched;
     }
-    console.log(order, "order");
+
+    // ✅ Step 6: Success - Return Order Info
     return res.status(200).json({
       success: true,
       message: "COD Order placed successfully",
       order_id: order.id,
       order_number: order.order_number,
-      thank_you_url: order?.order_status_url,
+      thank_you_url: order.order_status_url,
     });
   } catch (err) {
     console.error("COD Order Error:", err?.response?.data || err.message);
