@@ -98,7 +98,7 @@ export const placeCodOrder = async (req, res) => {
       }
     );
 
-    console.log(completeRes, "completeRes");
+    console.log(completeRes.data, "completeRes");
     const order = completeRes.data?.order;
 
     if (!order) {
