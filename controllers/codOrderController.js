@@ -140,13 +140,13 @@ export const placeCodOrder = async (req, res) => {
 
       order = match;
     }
-
+    console.log(order, "order");
     return res.status(200).json({
       success: true,
       message: "COD Order placed successfully",
       order_id: order.id,
       order_number: order.order_number,
-      thank_you_url: order.order_status_url,
+      thank_you_url: order?.order_status_url,
     });
   } catch (err) {
     console.error("COD Order Error:", err?.response?.data || err.message);
