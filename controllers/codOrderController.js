@@ -17,7 +17,7 @@ export const placeCodOrder = async (req, res) => {
   } = req.body;
 
   try {
-    // Step 0: Validate Inputs
+    // Validation
     if (
       !shop ||
       !variantId ||
@@ -29,22 +29,18 @@ export const placeCodOrder = async (req, res) => {
       !province ||
       !zip
     ) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing fields in request.",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing required fields." });
     }
 
-    // Step 1: Get Access Token
     const accessToken = await getAccessToken(shop);
     if (!accessToken) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid shop token",
-      });
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid shop token" });
     }
 
-    // Step 2: Prepare customer & address
     const sanitizedPhone = phone.replace(/\D/g, "");
     const customerEmail = email?.trim() || `cod-${sanitizedPhone}@trazoonow.in`;
 
@@ -65,20 +61,17 @@ export const placeCodOrder = async (req, res) => {
       phone,
     };
 
-    // Step 3: Create Draft Order
+    // Step 1: Create Draft Order
     const draftRes = await axios.post(
       `https://${shop}/admin/api/2024-04/draft_orders.json`,
       {
         draft_order: {
           line_items: [
-            {
-              variant_id: Number(variantId),
-              quantity: Number(quantity),
-            },
+            { variant_id: Number(variantId), quantity: Number(quantity) },
           ],
-          customer,
           email: customerEmail,
-          phone: phone,
+          phone,
+          customer,
           shipping_address: addressObj,
           billing_address: addressObj,
           tags: "COD",
@@ -95,11 +88,11 @@ export const placeCodOrder = async (req, res) => {
     );
 
     const draftOrder = draftRes.data?.draft_order;
-    if (!draftOrder || !draftOrder.id) {
+    if (!draftOrder?.id) {
       throw new Error("Draft order creation failed.");
     }
 
-    // Step 4: Complete Draft Order (convert to real order)
+    // Step 2: Complete the Draft Order
     let order = null;
     try {
       const completeRes = await axios.put(
@@ -113,14 +106,14 @@ export const placeCodOrder = async (req, res) => {
         }
       );
       order = completeRes?.data?.order;
-    } catch (completeErr) {
-      console.warn("Draft may already be completed:", completeErr.message);
+    } catch (err) {
+      console.warn("Draft might already be completed:", err.message);
     }
 
-    // Step 5: Fallback - Find Order If Not Returned in Response
+    // Step 3: If no order, search recent matching orders
     if (!order) {
-      const recentOrdersRes = await axios.get(
-        `https://${shop}/admin/api/2024-04/orders.json?limit=5&status=any&fields=id,order_number,order_status_url,note,tags`,
+      const recentOrders = await axios.get(
+        `https://${shop}/admin/api/2024-04/orders.json?limit=5&status=any`,
         {
           headers: {
             "X-Shopify-Access-Token": accessToken,
@@ -129,29 +122,52 @@ export const placeCodOrder = async (req, res) => {
         }
       );
 
-      const matched = recentOrdersRes.data.orders.find(
-        (o) => o.tags?.includes("COD") && o.note === "COD Draft Order"
+      order = recentOrders.data.orders.find(
+        (o) =>
+          o.tags?.includes("COD") &&
+          o.note === "COD Draft Order" &&
+          o.email === customerEmail &&
+          o.line_items?.some(
+            (li) =>
+              li.variant_id === Number(variantId) &&
+              li.quantity === Number(quantity)
+          )
       );
 
-      if (!matched) {
+      if (!order) {
         return res.status(200).json({
           success: true,
-          message: "Order may have been created, but could not locate it.",
+          message: "Order created but could not locate it.",
           draft_order_id: draftOrder.id,
           invoice_url: draftOrder.invoice_url,
         });
       }
-
-      order = matched;
     }
 
-    // ✅ Step 6: Success - Return Order Info
+    // Step 4: If order_status_url missing, fetch by ID
+    if (!order.order_status_url && order.id) {
+      try {
+        const orderByIdRes = await axios.get(
+          `https://${shop}/admin/api/2024-04/orders/${order.id}.json`,
+          {
+            headers: {
+              "X-Shopify-Access-Token": accessToken,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        order = orderByIdRes.data.order;
+      } catch (fetchErr) {
+        console.warn("Failed to fetch order by ID:", fetchErr.message);
+      }
+    }
+
     return res.status(200).json({
       success: true,
       message: "COD Order placed successfully",
       order_id: order.id,
       order_number: order.order_number,
-      thank_you_url: order.order_status_url,
+      thank_you_url: order.order_status_url || null,
     });
   } catch (err) {
     console.error("COD Order Error:", err?.response?.data || err.message);
