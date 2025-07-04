@@ -101,6 +101,7 @@ export const placeCodOrder = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "COD Order created",
+      order1: completeRes,
       order: completeRes.data.order,
     });
   } catch (err) {
