@@ -42,7 +42,6 @@ export const placeCodOrder = async (req, res) => {
 
     const sanitizedPhone = phone.replace(/\D/g, "");
     const dummyEmail = `cod-${sanitizedPhone}@trazoonow.in`;
-
     const customerEmail = email?.trim() || dummyEmail;
 
     const customer = {
@@ -62,7 +61,7 @@ export const placeCodOrder = async (req, res) => {
       phone,
     };
 
-    // Create Draft Order
+    // Step 1: Create Draft Order
     const draftRes = await axios.post(
       `https://${shop}/admin/api/2024-04/draft_orders.json`,
       {
@@ -73,8 +72,8 @@ export const placeCodOrder = async (req, res) => {
               quantity: Number(quantity),
             },
           ],
-          email: customerEmail, // ✅ ensures email shows in Contact Info
-          phone: phone, // ✅ ensures phone shows in Contact Info
+          email: customerEmail,
+          phone: phone,
           customer,
           shipping_address: addressObj,
           billing_address: addressObj,
@@ -96,27 +95,50 @@ export const placeCodOrder = async (req, res) => {
       throw new Error("Draft order creation failed.");
     }
 
-    // Complete Draft Order
-    const completeRes = await axios.put(
-      `https://${shop}/admin/api/2024-04/draft_orders/${draftOrder.id}/complete.json`,
-      { payment_pending: true },
-      {
-        headers: {
-          "X-Shopify-Access-Token": accessToken,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    // Step 2: Complete the Draft Order
+    let order = null;
+    try {
+      const completeRes = await axios.put(
+        `https://${shop}/admin/api/2024-04/draft_orders/${draftOrder.id}/complete.json`,
+        { payment_pending: true },
+        {
+          headers: {
+            "X-Shopify-Access-Token": accessToken,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      order = completeRes?.data?.order;
+    } catch (completeErr) {
+      console.warn("Draft might already be completed:", completeErr.message);
+    }
 
-    const order = completeRes?.data?.order;
-
+    // Step 3: If no order in response, fetch recent orders to get it
     if (!order) {
-      return res.status(200).json({
-        success: true,
-        message: "Draft completed. Order may already exist.",
-        draft_order_id: draftOrder.id,
-        invoice_url: draftOrder.invoice_url,
-      });
+      const recentOrdersRes = await axios.get(
+        `https://${shop}/admin/api/2024-04/orders.json?limit=5&status=any`,
+        {
+          headers: {
+            "X-Shopify-Access-Token": accessToken,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const match = recentOrdersRes.data.orders.find(
+        (o) => o.tags?.includes("COD") && o.note === "COD Draft Order"
+      );
+
+      if (!match) {
+        return res.status(200).json({
+          success: true,
+          message: "Draft completed, order created but could not locate it.",
+          draft_order_id: draftOrder.id,
+          invoice_url: draftOrder.invoice_url,
+        });
+      }
+
+      order = match;
     }
 
     return res.status(200).json({
