@@ -17,10 +17,8 @@ export const placeCodOrder = async (req, res) => {
   } = req.body;
 
   try {
-    // Validate required fields
     if (
       !shop ||
-      !email ||
       !variantId ||
       !quantity ||
       !name ||
@@ -42,13 +40,17 @@ export const placeCodOrder = async (req, res) => {
         .json({ success: false, message: "Invalid shop token" });
     }
 
-    // const customer = { first_name: name, phone };
-    const dummyEmail = `cod-${phone.replace(/\D/g, "")}@trazoonow.in`;
+    const sanitizedPhone = phone.replace(/\D/g, "");
+    const dummyEmail = `cod-${sanitizedPhone}@trazoonow.in`;
+
+    const customerEmail = email?.trim() || dummyEmail;
+
     const customer = {
       first_name: name,
       phone,
-      email: email ? email : dummyEmail,
+      email: customerEmail,
     };
+
     const addressObj = {
       first_name: name,
       address1: address,
@@ -60,7 +62,7 @@ export const placeCodOrder = async (req, res) => {
       phone,
     };
 
-    // Step 1: Create Draft Order
+    // Create Draft Order
     const draftRes = await axios.post(
       `https://${shop}/admin/api/2024-04/draft_orders.json`,
       {
@@ -71,6 +73,8 @@ export const placeCodOrder = async (req, res) => {
               quantity: Number(quantity),
             },
           ],
+          email: customerEmail, // ✅ ensures email shows in Contact Info
+          phone: phone, // ✅ ensures phone shows in Contact Info
           customer,
           shipping_address: addressObj,
           billing_address: addressObj,
@@ -92,7 +96,7 @@ export const placeCodOrder = async (req, res) => {
       throw new Error("Draft order creation failed.");
     }
 
-    // Step 2: Complete Draft Order
+    // Complete Draft Order
     const completeRes = await axios.put(
       `https://${shop}/admin/api/2024-04/draft_orders/${draftOrder.id}/complete.json`,
       { payment_pending: true },
@@ -107,16 +111,14 @@ export const placeCodOrder = async (req, res) => {
     const order = completeRes?.data?.order;
 
     if (!order) {
-      // If no order object returned, return draft invoice as fallback
       return res.status(200).json({
         success: true,
-        message: "Draft order completed, but no order returned.",
+        message: "Draft completed. Order may already exist.",
         draft_order_id: draftOrder.id,
         invoice_url: draftOrder.invoice_url,
       });
     }
 
-    // Final success response
     return res.status(200).json({
       success: true,
       message: "COD Order placed successfully",
