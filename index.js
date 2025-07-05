@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import authRoutes from "./routes/authRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import codOrderRoutes from "./routes/codOrderRoutes.js";
+import addressRoutes from "./routes/addressRoutes.js";
 
 dotenv.config();
 
@@ -17,6 +18,7 @@ app.use("/", authRoutes);
 app.use("/api/order/", orderRoutes);
 
 app.use("/api/cod-order", codOrderRoutes);
+app.use("/api/address", addressRoutes);
 
 // Serve widget JS
 app.get("/cod-popup.js", (req, res) => {
