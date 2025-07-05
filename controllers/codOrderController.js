@@ -140,7 +140,7 @@ export const placeCodOrder = async (req, res) => {
           )
       );
     }
-
+    console.log(JSON.stringify(order));
     // Step 4: Ensure order_status_url exists
     if (order?.id && !order.order_status_url) {
       try {
