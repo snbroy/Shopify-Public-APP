@@ -1,5 +1,5 @@
 import axios from "axios";
-import { LOCATIONIQ_API_KEY } from "../utils/constants";
+import { LOCATIONIQ_API_KEY } from "../utils/constants.js";
 
 export const getAddressSuggestions = async (req, res) => {
   const { q } = req.query;
