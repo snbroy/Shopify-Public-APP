@@ -29,19 +29,17 @@ export const placeCodOrder = async (req, res) => {
       !province ||
       !zip
     ) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing required fields.",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing required fields." });
     }
 
     // 2. Get shop access token
     const accessToken = await getAccessToken(shop);
     if (!accessToken) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid shop token",
-      });
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid shop token" });
     }
 
     // 3. Prepare customer & address data
@@ -96,8 +94,7 @@ export const placeCodOrder = async (req, res) => {
       throw new Error("Draft order creation failed.");
     }
 
-    // 5. Attempt to complete draft order
-    let order = null;
+    // 5. Complete draft order
     try {
       const completeRes = await axios.put(
         `https://${shop}/admin/api/2024-04/draft_orders/${draftOrder.id}/complete.json`,
@@ -109,17 +106,31 @@ export const placeCodOrder = async (req, res) => {
           },
         }
       );
-      order = completeRes?.data?.order;
     } catch (err) {
       console.warn("Draft may already be completed:", err.message);
     }
 
-    // 6. Fallback: Find recently created order
-    console.log(shop, "shop name");
-    if (!order) {
-      try {
-        const recentOrdersRes = await axios.get(
-          `https://${shop}/admin/api/2024-04/orders.json?limit=5&status=any`,
+    // 6. Get customer using email to fetch their orders
+    let order = null;
+    try {
+      const customerSearchRes = await axios.get(
+        `https://${shop}/admin/api/2024-04/customers/search.json?query=email:${encodeURIComponent(
+          customerEmail
+        )}`,
+        {
+          headers: {
+            "X-Shopify-Access-Token": accessToken,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const customerObj = customerSearchRes.data?.customers?.[0];
+      if (customerObj?.id) {
+        const customerId = customerObj.id;
+
+        const customerOrdersRes = await axios.get(
+          `https://${shop}/admin/api/2024-04/customers/${customerId}/orders.json?limit=1&status=any&order=created_at desc`,
           {
             headers: {
               "X-Shopify-Access-Token": accessToken,
@@ -128,51 +139,18 @@ export const placeCodOrder = async (req, res) => {
           }
         );
 
-        console.log(JSON.stringify(recentOrdersRes.data));
-
-        const orders = recentOrdersRes.data.orders || [];
-        order = orders.find(
-          (o) =>
-            o.tags?.includes("COD") &&
-            o.note === "COD Draft Order" &&
-            o.email === customerEmail &&
-            o.line_items?.some(
-              (li) =>
-                li.variant_id === Number(variantId) &&
-                li.quantity === Number(quantity)
-            )
-        );
-      } catch (fetchErr) {
-        console.warn("Failed to fetch recent orders:", fetchErr.message);
+        order = customerOrdersRes.data.orders?.[0];
       }
+    } catch (err) {
+      console.warn("Customer fetch or order lookup failed:", err.message);
     }
 
-    // 7. Ensure order_status_url exists
-    if (order?.id && !order.order_status_url) {
-      try {
-        const orderByIdRes = await axios.get(
-          `https://${shop}/admin/api/2024-04/orders/${order.id}.json?fields=id,order_number,order_status_url`,
-          {
-            headers: {
-              "X-Shopify-Access-Token": accessToken,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-        order = orderByIdRes.data?.order;
-      } catch (err) {
-        console.warn("Failed to fetch order by ID:", err.message);
-      }
-    }
-
-    console.log("new lo");
-    console.log(JSON.stringify(order));
-    // 8. Final response
+    // 7. Final fallback to draft invoice if no order
     return res.status(200).json({
       success: true,
       message: "COD Order placed successfully",
-      order_id: order?.id,
-      order_number: order?.order_number,
+      order_id: order?.id || null,
+      order_number: order?.order_number || null,
       thank_you_url: order?.order_status_url || draftOrder?.invoice_url || null,
     });
   } catch (err) {
