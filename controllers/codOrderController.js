@@ -1,7 +1,5 @@
 import axios from "axios";
 import { getAccessToken } from "../models/shopModel.js";
-import { json } from "express";
-import { stringify } from "querystring";
 
 export const placeCodOrder = async (req, res) => {
   const {
@@ -19,7 +17,7 @@ export const placeCodOrder = async (req, res) => {
   } = req.body;
 
   try {
-    // Validate inputs
+    // Validation
     if (
       !shop ||
       !variantId ||
@@ -31,16 +29,18 @@ export const placeCodOrder = async (req, res) => {
       !province ||
       !zip
     ) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Missing required fields." });
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields.",
+      });
     }
 
     const accessToken = await getAccessToken(shop);
     if (!accessToken) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Invalid shop token" });
+      return res.status(401).json({
+        success: false,
+        message: "Invalid shop token",
+      });
     }
 
     const sanitizedPhone = phone.replace(/\D/g, "");
@@ -48,8 +48,8 @@ export const placeCodOrder = async (req, res) => {
 
     const customer = {
       first_name: name,
-      email: customerEmail,
       phone: sanitizedPhone,
+      email: customerEmail,
     };
 
     const addressObj = {
@@ -60,7 +60,7 @@ export const placeCodOrder = async (req, res) => {
       province,
       zip,
       country: "India",
-      phone,
+      phone: sanitizedPhone,
     };
 
     // Step 1: Create Draft Order
@@ -94,7 +94,7 @@ export const placeCodOrder = async (req, res) => {
       throw new Error("Draft order creation failed.");
     }
 
-    // Step 2: Complete Draft Order
+    // Step 2: Try to complete draft order
     let order = null;
     try {
       const completeRes = await axios.put(
@@ -109,13 +109,10 @@ export const placeCodOrder = async (req, res) => {
       );
       order = completeRes?.data?.order;
     } catch (err) {
-      console.warn(
-        "Draft already completed or failed to complete:",
-        err.message
-      );
+      console.warn("Draft order might already be completed:", err.message);
     }
 
-    // Step 3: Fetch recent order if not returned in previous step
+    // Step 3: Fallback - Fetch last few orders if order not returned
     if (!order) {
       const recentOrdersRes = await axios.get(
         `https://${shop}/admin/api/2024-04/orders.json?limit=5&status=any`,
@@ -126,7 +123,6 @@ export const placeCodOrder = async (req, res) => {
           },
         }
       );
-      console.log(JSON.stringify(recentOrdersRes));
 
       order = recentOrdersRes.data.orders.find(
         (o) =>
@@ -140,8 +136,8 @@ export const placeCodOrder = async (req, res) => {
           )
       );
     }
-    console.log(JSON.stringify(order));
-    // Step 4: Ensure order_status_url exists
+
+    // Step 4: Ensure we get the order_status_url
     if (order?.id && !order.order_status_url) {
       try {
         const orderByIdRes = await axios.get(
@@ -155,7 +151,7 @@ export const placeCodOrder = async (req, res) => {
         );
         order = orderByIdRes.data.order;
       } catch (err) {
-        console.warn("Failed to fetch full order by ID:", err.message);
+        console.warn("Failed to fetch order by ID:", err.message);
       }
     }
 
@@ -168,7 +164,12 @@ export const placeCodOrder = async (req, res) => {
       thank_you_url: order?.order_status_url || draftOrder?.invoice_url || null,
     });
   } catch (err) {
-    console.error("COD Order Error:", err?.response?.data || err.message);
+    console.error("COD Order Error:", {
+      message: err.message,
+      status: err?.response?.status,
+      data: err?.response?.data,
+    });
+
     return res.status(500).json({
       success: false,
       message: "Failed to create COD order",
