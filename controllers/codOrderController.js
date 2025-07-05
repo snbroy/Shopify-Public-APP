@@ -165,6 +165,8 @@ export const placeCodOrder = async (req, res) => {
       }
     }
 
+    console.log("new lo");
+    console.log(JSON.stringify(order));
     // 8. Final response
     return res.status(200).json({
       success: true,
