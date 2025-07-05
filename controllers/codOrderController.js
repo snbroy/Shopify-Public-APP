@@ -115,6 +115,7 @@ export const placeCodOrder = async (req, res) => {
     }
 
     // 6. Fallback: Find recently created order
+    console.log(shop, "shop name");
     if (!order) {
       try {
         const recentOrdersRes = await axios.get(
@@ -127,7 +128,7 @@ export const placeCodOrder = async (req, res) => {
           }
         );
 
-        console.log(JSON.stringify(recentOrdersRes));
+        console.log(JSON.stringify(recentOrdersRes.data));
 
         const orders = recentOrdersRes.data.orders || [];
         order = orders.find(
