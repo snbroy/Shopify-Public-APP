@@ -1,5 +1,7 @@
 import axios from "axios";
 import { getAccessToken } from "../models/shopModel.js";
+import { json } from "express";
+import { stringify } from "querystring";
 
 export const placeCodOrder = async (req, res) => {
   const {
@@ -124,6 +126,7 @@ export const placeCodOrder = async (req, res) => {
           },
         }
       );
+      console.log(JSON.stringify(recentOrdersRes));
 
       order = recentOrdersRes.data.orders.find(
         (o) =>
