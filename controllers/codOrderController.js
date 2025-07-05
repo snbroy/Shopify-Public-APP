@@ -127,6 +127,8 @@ export const placeCodOrder = async (req, res) => {
           }
         );
 
+        console.log(JSON.stringify(recentOrdersRes));
+
         const orders = recentOrdersRes.data.orders || [];
         order = orders.find(
           (o) =>
