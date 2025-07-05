@@ -1,8 +1,17 @@
 import axios from "axios";
 import { LOCATIONIQ_API_KEY } from "../utils/constants.js";
+import { getAccessToken } from "../models/shopModel.js";
 
 export const getAddressSuggestions = async (req, res) => {
   const query = req.query.q;
+  const shop = req.query.shop;
+
+  const accessToken = await getAccessToken(shop);
+  if (!accessToken) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Invalid shop token" });
+  }
 
   if (!query || typeof query !== "string" || query.length < 3) {
     return res.status(400).json({

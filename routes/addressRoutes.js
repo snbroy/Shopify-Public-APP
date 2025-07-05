@@ -5,6 +5,6 @@ import { verifyAccessToken } from "../middlewares/authMiddleware.js";
 const router = express.Router();
 
 // GET /api/address?q=delhi
-router.get("/", verifyAccessToken, getAddressSuggestions);
+router.get("/", getAddressSuggestions);
 
 export default router;
